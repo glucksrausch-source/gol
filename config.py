@@ -1,64 +1,67 @@
 """
-Configuration and constants for the Game of Life simulation.
+Configuration and constants for the Alchemical Game of Life - 10,000x10,000 World.
 """
 
 # Window settings
-WINDOW_TITLE = "Advanced Conway's Game of Life - 10-Regeln-Cockpit"
-DEFAULT_WIDTH = 1200
-DEFAULT_HEIGHT = 800
+WINDOW_TITLE = "Das Große Alchemie-Labor - 10.000x10.000"
+DEFAULT_WIDTH = 1400
+DEFAULT_HEIGHT = 900
 
 # Simulation Defaults
-DEFAULT_GRID_WIDTH = 200
-DEFAULT_GRID_HEIGHT = 200
-DEFAULT_TPS = 10
+DEFAULT_GRID_WIDTH = 10000
+DEFAULT_GRID_HEIGHT = 10000
+DEFAULT_TPS = 15
 MAX_TPS = 60
 
 # Colors (Hex)
-COLOR_BACKGROUND = "#121212"
-COLOR_ALIVE = "#00F0FF"
+COLOR_BACKGROUND = "#000000"
+COLOR_ALIVE = "#00F0FF" # Quecksilber (Mercury)
+COLOR_SULFUR = "#FF3E00" # Schwefel
+COLOR_SALT = "#FFFFFF" # Salz
+COLOR_FIRE = "#FFD700" # Philosophisches Feuer
 COLOR_ZOMBIE = "#39FF14"
-COLOR_MUTATION = "#FFD700"
 COLOR_PREDATOR = "#FF003C"
 COLOR_GHOST = "#404040"
-COLOR_BLACK_HOLE = "#000000"
-COLOR_BLACK_HOLE_BORDER = "#FFFFFF"
+COLOR_BLACK_HOLE = "#101010"
+COLOR_BLACK_HOLE_BORDER = "#444444"
 
 # UI Strings (German)
-STR_PLAY = "Start"
-STR_PAUSE = "Pause"
-STR_RESET = "Reset"
-STR_CLEAR = "Löschen"
-STR_RANDOMIZE = "Zufällig"
-STR_SETTINGS = "Einstellungen"
-STR_RULES = "10-Regeln-Cockpit"
-STR_GRID_SIZE = "Grid-Größe"
-STR_SPEED = "Geschwindigkeit (TPS)"
-STR_WINTER_ACTIVE = "--- WINTER ---"
+STR_PLAY = "Transmutation Starten"
+STR_PAUSE = "Stasis"
+STR_RESET = "Labor Reinigen"
+STR_CLEAR = "Alles Löschen"
+STR_RANDOMIZE = "Ur-Suppe Erzeugen"
+STR_SETTINGS = "Alchemistische Parameter"
+STR_RULES = "Die 10 Großen Regeln"
+STR_GRID_SIZE = "Welt-Größe"
+STR_SPEED = "Reaktions-Geschwindigkeit"
+STR_WINTER_ACTIVE = "--- KÄLTE-SCHOCK ---"
+STR_ALCHEMY_BREW = "Substanz Hinzufügen"
 
-# Rule names
+# Rule names (Alchemical themed)
 RULES = {
-    1: "Zombie-Zellen",
-    2: "Zell-Alterung",
-    3: "Spontane Mutation",
-    4: "Torus-Welt (Pac-Man)",
-    5: "Epidemien",
-    6: "Klima-Zyklen (Winter)",
-    7: "Räuber und Beute",
-    8: "Geister-Spuren",
-    9: "Fruchtbarkeits-Boost",
-    10: "Schwarze Löcher"
+    1: "Zombifizierung (Fäulnis)",
+    2: "Natürlicher Zerfall",
+    3: "Spontane Transmutation",
+    4: "Torus-Welt (Unendlichkeit)",
+    5: "Große Reinigung (Epidemie)",
+    6: "Ewiger Winter",
+    7: "Räuber & Beute (Verzehr)",
+    8: "Schatten-Echos",
+    9: "Lebens-Elixier (Boost)",
+    10: "Der Abgrund (Schwarze Löcher)"
 }
 
 # Rule Tooltips
 RULE_TOOLTIPS = {
-    1: "Sterbende Zellen werden für 1 Tick zu Zombies und töten einen Nachbarn.",
-    2: "Zellen sterben nach 15 Ticks an Altersschwäche.",
-    3: "2% Chance auf Mutation bei Geburt (3 Ticks immun).",
-    4: "Spielfeld ohne Ränder (Wrap-around).",
-    5: "Volle 3x3 Matrizen sterben sofort.",
-    6: "Alle 50 Ticks kommt für 10 Ticks der Winter (3 Nachbarn zum Überleben nötig).",
-    7: "Rote Räuber fressen Zellen und verhungern nach 3 Ticks ohne Nahrung.",
-    8: "Sterbende Zellen blockieren das Feld für 1 Tick.",
-    9: "Zellen > 10 Ticks sind hochfruchtbar (Geburt bei 2 Nachbarn).",
-    10: "Statische 2x2 Blöcke werden nach 20 Ticks zu Schwarzen Löchern."
+    1: "Zellen im Zerfall reißen andere mit sich.",
+    2: "Alles Leben kehrt irgendwann zu Staub zurück.",
+    3: "Zufällige Verwandlung bei der Geburt.",
+    4: "Die Welt hat kein Ende.",
+    5: "Überpopulation führt zur sofortigen Reinigung.",
+    6: "Kälte verlangsamt das Wachstum.",
+    7: "Rote Räuber jagen die blauen Zellen.",
+    8: "Vergangenes Leben hinterlässt Spuren.",
+    9: "Alte Zellen begünstigen neues Leben.",
+    10: "Konzentrierte Materie kollabiert."
 }
