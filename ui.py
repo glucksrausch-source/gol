@@ -184,6 +184,7 @@ class GameWindow(QMainWindow):
         ctrl_group.layout().addWidget(self.btn_play)
         ctrl_group.layout().addWidget(btn_reset)
         ctrl_group.layout().addWidget(btn_random)
+        sidebar_layout.addWidget(ctrl_group)
 
         # Alchemy Lab
         alchemy_group = self._create_group("Alchemie-Labor")
