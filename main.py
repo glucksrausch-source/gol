@@ -4,14 +4,12 @@ from ui import GameWindow
 
 def main():
     """
-    Main entry point for the Advanced Game of Life application.
+    Das Große Alchemie-Labor - 10.000x10.000 Simulation.
 
     Installation:
     pip install PySide6 numpy scipy
     """
     app = QApplication(sys.argv)
-
-    # Set app-wide dark theme (optional but recommended for Cyberpunk feel)
     app.setStyle("Fusion")
 
     window = GameWindow()
