@@ -2,7 +2,8 @@ import sys
 import numpy as np
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QPushButton, QSlider, QLabel, QCheckBox, QFrame,
-                             QSizePolicy, QGridLayout, QScrollArea, QComboBox)
+                             QSizePolicy, QGridLayout, QScrollArea, QComboBox,
+                             QSpinBox, QFormLayout)
 from PySide6.QtCore import Qt, QTimer, Slot, QPoint, QSize, QRect
 from PySide6.QtGui import QImage, QPixmap, QPainter, QColor, QPalette, QBrush
 
@@ -18,11 +19,12 @@ class GridWidget(QWidget):
         self.panning = False
         self.draw_value = True
         self.draw_layer = 'alive'
+        self.brush_size = 1
 
         # Viewport settings
         self.zoom = 1.0
-        self.offset_x = 4500
-        self.offset_y = 4500
+        self.offset_x = max(0, (self.engine.width - 1000) // 2)
+        self.offset_y = max(0, (self.engine.height - 1000) // 2)
 
         self.colors = {
             'bg': self._hex_to_rgb(config.COLOR_BACKGROUND),
@@ -139,7 +141,7 @@ class GridWidget(QWidget):
     def _handle_mouse(self, pos):
         grid_x = self.offset_x + int(pos.x() / self.zoom)
         grid_y = self.offset_y + int(pos.y() / self.zoom)
-        self.engine.set_cell(grid_x, grid_y, True, self.draw_layer)
+        self.engine.set_cell(grid_x, grid_y, True, self.draw_layer, brush_size=self.brush_size)
         self.update()
 
 class GameWindow(QMainWindow):
@@ -186,6 +188,43 @@ class GameWindow(QMainWindow):
         ctrl_group.layout().addWidget(btn_random)
         sidebar_layout.addWidget(ctrl_group)
 
+        # Advanced Settings
+        adv_group = self._create_group("Erweiterte Einstellungen")
+
+        # Grid Size
+        size_layout = QHBoxLayout()
+        self.spin_width = QSpinBox()
+        self.spin_width.setRange(10, 10000)
+        self.spin_width.setValue(self.engine.width)
+        self.spin_height = QSpinBox()
+        self.spin_height.setRange(10, 10000)
+        self.spin_height.setValue(self.engine.height)
+        size_layout.addWidget(QLabel("B:"))
+        size_layout.addWidget(self.spin_width)
+        size_layout.addWidget(QLabel("H:"))
+        size_layout.addWidget(self.spin_height)
+
+        btn_apply_size = QPushButton("Größe anwenden")
+        btn_apply_size.clicked.connect(self.apply_grid_size)
+
+        # TPS Slider
+        tps_layout = QHBoxLayout()
+        self.tps_slider = QSlider(Qt.Horizontal)
+        self.tps_slider.setRange(1, config.MAX_TPS)
+        self.tps_slider.setValue(config.DEFAULT_TPS)
+        self.tps_slider.valueChanged.connect(self.set_tps)
+        self.tps_label = QLabel(f"{config.DEFAULT_TPS} TPS")
+        self.tps_slider.valueChanged.connect(lambda v: self.tps_label.setText(f"{v} TPS"))
+        tps_layout.addWidget(self.tps_slider)
+        tps_layout.addWidget(self.tps_label)
+
+        adv_group.layout().addWidget(QLabel(config.STR_GRID_SIZE))
+        adv_group.layout().addLayout(size_layout)
+        adv_group.layout().addWidget(btn_apply_size)
+        adv_group.layout().addWidget(QLabel(config.STR_SPEED))
+        adv_group.layout().addLayout(tps_layout)
+        sidebar_layout.addWidget(adv_group)
+
         # Alchemy Lab
         alchemy_group = self._create_group("Alchemie-Labor")
         self.combo_layer = QComboBox()
@@ -194,6 +233,16 @@ class GameWindow(QMainWindow):
         self.combo_layer.currentTextChanged.connect(lambda t: setattr(self.grid_widget, 'draw_layer', layer_map[t]))
         alchemy_group.layout().addWidget(QLabel("Aktive Substanz:"))
         alchemy_group.layout().addWidget(self.combo_layer)
+
+        # Brush Size
+        brush_layout = QHBoxLayout()
+        self.brush_spin = QSpinBox()
+        self.brush_spin.setRange(1, 50)
+        self.brush_spin.setValue(1)
+        self.brush_spin.valueChanged.connect(self.update_brush_size)
+        brush_layout.addWidget(QLabel("Pinselgröße:"))
+        brush_layout.addWidget(self.brush_spin)
+        alchemy_group.layout().addLayout(brush_layout)
 
         btn_spawn = QPushButton("Substanz-Injektion")
         btn_spawn.clicked.connect(self.engine._spawn_seeds)
@@ -208,6 +257,11 @@ class GameWindow(QMainWindow):
             cb.toggled.connect(lambda checked, idx=i: self.engine.toggle_rule(idx, checked))
             rules_group.layout().addWidget(cb)
         sidebar_layout.addWidget(rules_group)
+
+        # Stats
+        self.stats_label = QLabel("Lebende Zellen: 0")
+        self.stats_label.setStyleSheet("font-weight: bold; color: #4caf50;")
+        sidebar_layout.addWidget(self.stats_label)
 
         self.info_label = QLabel()
         self.info_label.setAlignment(Qt.AlignCenter)
@@ -243,6 +297,17 @@ class GameWindow(QMainWindow):
     def set_tps(self, tps):
         self.timer.setInterval(1000 // tps)
 
+    def update_brush_size(self, size):
+        self.grid_widget.brush_size = size
+
+    def apply_grid_size(self):
+        w = self.spin_width.value()
+        h = self.spin_height.value()
+        self.engine.reset(width=w, height=h)
+        self.grid_widget.offset_x = max(0, (w - 1000) // 2)
+        self.grid_widget.offset_y = max(0, (h - 1000) // 2)
+        self.grid_widget.update()
+
     def tick(self):
         self.engine.step()
         self.grid_widget.update()
@@ -250,14 +315,17 @@ class GameWindow(QMainWindow):
             self.info_label.setText(config.STR_WINTER_ACTIVE)
         else:
             self.info_label.setText("")
+        self.stats_label.setText(f"Lebende Zellen: {self.engine.get_alive_count()}")
 
     def reset_engine(self):
         self.engine.reset()
         self.grid_widget.update()
+        self.stats_label.setText("Lebende Zellen: 0")
 
     def randomize_engine(self):
         self.engine.randomize()
         self.grid_widget.update()
+        self.stats_label.setText(f"Lebende Zellen: {self.engine.get_alive_count()}")
 
 if __name__ == "__main__":
     from PySide6.QtWidgets import QApplication

@@ -63,15 +63,24 @@ class GameEngine:
                 self.state.black_hole.fill(0)
                 self.state.block_static_count.fill(0)
 
-    def set_cell(self, x: int, y: int, value: bool, layer: str = 'alive') -> None:
-        if 0 <= x < self.width and 0 <= y < self.height:
+    def set_cell(self, x: int, y: int, value: bool, layer: str = 'alive', brush_size: int = 1) -> None:
+        half_brush = brush_size // 2
+        y_min = max(0, y - half_brush)
+        y_max = min(self.height, y + half_brush + (brush_size % 2))
+        x_min = max(0, x - half_brush)
+        x_max = min(self.width, x + half_brush + (brush_size % 2))
+
+        if y_min < y_max and x_min < x_max:
             target = getattr(self.state, layer)
             if target.dtype == bool:
-                target[y, x] = value
+                target[y_min:y_max, x_min:x_max] = value
             else:
-                target[y, x] = 5 if value else 0
+                target[y_min:y_max, x_min:x_max] = 5 if value else 0
             if value and layer == 'alive':
-                self.state.age[y, x] = 0
+                self.state.age[y_min:y_max, x_min:x_max] = 0
+
+    def get_alive_count(self) -> int:
+        return np.count_nonzero(self.state.alive)
 
     def randomize(self) -> None:
         shape = (self.height, self.width)
@@ -101,6 +110,20 @@ class GameEngine:
     def step(self) -> None:
         self.state.tick_count += 1
 
+        # Calculate bounding box to dramatically reduce calculation size
+        bounds = self._get_active_bounds()
+        if bounds is None:
+            # Nothing active, just process tick-based spawns and fading effects
+            if self.state.tick_count % 10 == 0:
+                self._spawn_seeds()
+            self.state.fire[self.state.fire > 0] -= 1
+            if self.rules_enabled[8]:
+                self.state.ghost.fill(False)
+            return
+
+        rmin, rmax, cmin, cmax = bounds
+        slice_obj = np.s_[rmin:rmax, cmin:cmax]
+
         # 0. Autonomous Spawning
         if self.state.tick_count % 10 == 0:
             self._spawn_seeds()
@@ -115,13 +138,18 @@ class GameEngine:
         dying_of_old_age = self._handle_aging()
 
         # 3. Conway Core (Mercury/Alive)
-        if np.any(self.state.alive):
-            neighbor_count = self._count_neighbors(self.state.alive)
+        if np.any(self.state.alive[slice_obj]):
+            # Use bounded area for neighbors
+            neighbor_count_sub = self._count_neighbors(self.state.alive, slice_obj)
+            neighbor_count = np.zeros_like(self.state.alive, dtype=np.int8)
+            neighbor_count[slice_obj] = neighbor_count_sub
 
             # Rule 9: Fertility Boost
             if self.rules_enabled[9]:
                 hf_mask = self.state.alive & (self.state.age > 10)
-                hf_neighbors = self._count_neighbors(hf_mask)
+                hf_neighbors_sub = self._count_neighbors(hf_mask, slice_obj)
+                hf_neighbors = np.zeros_like(neighbor_count)
+                hf_neighbors[slice_obj] = hf_neighbors_sub
             else:
                 hf_neighbors = np.zeros_like(neighbor_count)
 
@@ -181,12 +209,16 @@ class GameEngine:
             self.state.ghost = new_ghost
 
         # 5. Secondary Elements (Sulfur & Salt)
-        if np.any(self.state.sulfur):
-            sn = self._count_neighbors(self.state.sulfur)
+        if np.any(self.state.sulfur[slice_obj]):
+            sn_sub = self._count_neighbors(self.state.sulfur, slice_obj)
+            sn = np.zeros_like(self.state.sulfur, dtype=np.int8)
+            sn[slice_obj] = sn_sub
             self.state.sulfur = (self.state.sulfur & (sn > 0) & (sn < 5)) | ((~self.state.sulfur) & (sn == 3))
 
-        if np.any(self.state.salt):
-            san = self._count_neighbors(self.state.salt)
+        if np.any(self.state.salt[slice_obj]):
+            san_sub = self._count_neighbors(self.state.salt, slice_obj)
+            san = np.zeros_like(self.state.salt, dtype=np.int8)
+            san[slice_obj] = san_sub
             self.state.salt = (self.state.salt & (san >= 2) & (san <= 3)) | ((~self.state.salt) & (san == 3))
 
         self.state.fire[self.state.fire > 0] -= 1
@@ -220,9 +252,43 @@ class GameEngine:
             self.state.alive[explosion_mask] = True
             self.state.salt[explosion_mask] = False
 
-    def _count_neighbors(self, grid: np.ndarray) -> np.ndarray:
+    def _get_active_bounds(self) -> Optional[Tuple[int, int, int, int]]:
+        """Returns the bounding box (rmin, rmax, cmin, cmax) of active cells to optimize calculations."""
+        # Simple mask of what we consider "active" for bounding box purposes
+        active = self.state.alive | self.state.sulfur | self.state.salt | self.state.zombie | self.state.predator
+        if self.rules_enabled[10]:
+            active |= (self.state.black_hole > 0)
+
+        rows = np.any(active, axis=1)
+        if not np.any(rows):
+            return None
+        cols = np.any(active, axis=0)
+
+        rmin, rmax = int(np.argmax(rows)), int(len(rows) - np.argmax(rows[::-1]))
+        cmin, cmax = int(np.argmax(cols)), int(len(cols) - np.argmax(cols[::-1]))
+
+        # Add padding to allow expansion
+        pad = 5
+        rmin = max(0, rmin - pad)
+        rmax = min(self.height, rmax + pad)
+        cmin = max(0, cmin - pad)
+        cmax = min(self.width, cmax + pad)
+
+        # In torus world (Rule 4), we just process the whole grid if wrapping is enabled
+        # and things get too close to the edges to avoid complex boundary math.
+        if self.rules_enabled[4] and (rmin == 0 or rmax == self.height or cmin == 0 or cmax == self.width):
+            return 0, self.height, 0, self.width
+
+        return rmin, rmax, cmin, cmax
+
+    def _count_neighbors(self, grid: np.ndarray, slice_obj: Optional[Tuple[slice, slice]] = None) -> np.ndarray:
         kernel = np.array([[1, 1, 1], [1, 0, 1], [1, 1, 1]], dtype=np.int8)
         mode = 'wrap' if self.rules_enabled[4] else 'constant'
+
+        if slice_obj is not None:
+            subgrid = grid[slice_obj].astype(np.int8)
+            return convolve(subgrid, kernel, mode=mode)
+
         return convolve(grid.astype(np.int8), kernel, mode=mode)
 
     def _is_winter(self) -> bool:
